@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  grafana:
+    image: grafana/grafana:7.1.5
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    depends_on:
+      - influxdb
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+  influxdb:
+    image: influxdb:1.8.2
+  telegraf:
+    image: telegraf:1.14.5-alpine
+    depends_on:
+      - influxdb
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+  db:
+    image: postgres:11.6
+    environment:
+      POSTGRES_USER: pspdfkit
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pspdfkit
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  pspdfkit:
+    image: pspdfkit/pspdfkit:2020.4.2
+    environment:
+      STATSD_HOST: telegraf
+      STATSD_PORT: 8125
+
+      ACTIVATION_KEY: <YOUR_ACTIVATION_KEY>
+      DASHBOARD_USERNAME: dashboard
+      DASHBOARD_PASSWORD: secret
+
+      PGUSER: pspdfkit
+      PGPASSWORD: password
+      PGDATABASE: pspdfkit
+      PGHOST: db
+      PGPORT: 5432
+      API_AUTH_TOKEN: secret
+      SECRET_KEY_BASE: secret-key-base
+      JWT_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALd41vG5rMzG26hhVxE65kzWC+bYQ94t
+        OxsSxIQZMOc1GY8ubuqu2iku5/5isaFfG44e+VAe+YIdVeQY7cUkaaUCAwEAAQ==
+        -----END PUBLIC KEY-----
+      JWT_ALGORITHM: RS256
+    ports:
+      - 5000:5000
+    depends_on:
+      - db
+      - telegraf
+
+volumes:
+  pgdata:
